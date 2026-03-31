@@ -8,7 +8,7 @@ import os
 import json
 import SimpleITK as sitk
 
-OVERWRITE = False
+
 # Labels for multilabel segmentation map for each patient - to be divided in two parts?
 JSON_LANDMARK_LABELS = {'13': 1, '16': 2, '23': 3, '26': 4, '33': 5, '36': 6, '43': 7, '46': 8, 'anteriornasalspine': 9,
                          'bpoint': 10, 'basion': 11, 'gnation': 12, 'inferiorborderl': 13, 'inferiorborderr': 14, 'infraorbitalel': 15,
@@ -164,38 +164,51 @@ class Patient:
         """
         size = img.GetSize()
         return all(0 <= index[i] < size[i] for i in range(3))
-
-
-if __name__ == "__main__":
-    base_path = r"R:\\TM Internships\\Dept of CMF\\Nynke van Jaarsveld\\Code\\database\\lowres\\groundtruth"
-    split_path = r"R:\\TM Internships\\Dept of CMF\\Nynke van Jaarsveld\\Code\\database\\lowres\\groundtruth_split"
     
+    def load_indices_from_segm(self, file_path):
+        """
+        If multilabel segmentation map already exists, this function loads the image and 
+        extracts the central voxel indices for every label found.
+        """
+        img = sitk.ReadImage(file_path)
+        stats = sitk.LabelShapeStatisticsImageFilter()
+        stats.Execute(img)
+
+        reverse_labels = {v: k for k, v in JSON_LANDMARK_LABELS.items()}
+
+        for label_value in stats.GetLabels():
+            if label_value in reverse_labels:
+                label_name = reverse_labels[label_value]
+                
+                # Get the centroid in physical coordinates, then convert to index
+                centroid_physical = stats.GetCentroid(label_value)
+                center_idx = img.TransformPhysicalPointToIndex(centroid_physical)
+                
+                self.landmark_indices[label_name] = list(center_idx)
+
+
+def multilabelsegmentation(base_path, overwrite):
     all_landmark_indices = {}
-
-    patients = []
-    for item in os.listdir(base_path):
-        if item.startswith('ma'):
-            full_path = os.path.join(base_path, item)
-            patients.append(Patient(full_path))
-
-    for p in patients:
-        print(f"Checking Patient: {p.id}")
-        
-        # Creating and saving multilabel segmentation map
-        segmented_blocks = p.segm_map()
-        output_path = os.path.join(p.path, f"{p.id}_landmark_map.nii.gz")
-        sitk.WriteImage(segmented_blocks, output_path)
-        print(f"Saved segmentation to: {output_path}")
-
-        # Adding indices of central landmark voxel  
-        all_landmark_indices[p.id] = p.landmark_indices
-
-    # Saving all_landmarks_voxels.json with indices of central landmark of all patients
-    json_out_path = os.path.join(split_path, "all_landmarks_voxels.json")
-    with open(json_out_path, 'w') as f:
-        json.dump(all_landmark_indices, f, indent=2)
     
-    print(f"\nCreated all_landmarks_voxels.json at: {json_out_path}")
+    # Get list of patient folders
+    patient_folders = [item for item in os.listdir(base_path) if item.startswith('ma')]
 
+    for folder in patient_folders:
+        full_path = os.path.join(base_path, folder)
+        p = Patient(full_path)
+        output_path = os.path.join(p.path, f"{p.id}_landmark_map.nii.gz")
 
+        # Check if we need to process or if we can just load
+        if overwrite or not os.path.exists(output_path):
+            print(f"Processing Patient: {p.id}")
+            segmented_blocks = p.segm_map()
+            sitk.WriteImage(segmented_blocks, output_path)
+            all_landmark_indices[p.id] = p.landmark_indices
+        else:
+            print(f"Skipping creation of multilabel segmentation maps for {p.id}, file already exists.")
+            p.load_indices_from_segm(output_path)
+            
+        all_landmark_indices[p.id] = p.landmark_indices 
+
+    return all_landmark_indices
 

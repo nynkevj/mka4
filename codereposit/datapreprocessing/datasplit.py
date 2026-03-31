@@ -9,10 +9,13 @@ import pandas as pd
 import shutil
 from pathlib import Path
 
-def setup_folders(csv_path, source_base, target_base, overwrite=False):
+def setup_folders(csv_path, source_base, overwrite=False):
     csv_path = Path(csv_path)
     source_base = Path(source_base)
-    target_base = Path(target_base)
+    
+    # Define folder with reorganized files
+    target_base = source_base.parent / f'{source_base.name}_split'
+    target_base.mkdir(parents=True, exist_ok=True)
 
     # Define the specific nnU-Net subfolders
     images_tr = target_base / "imagesTr"
@@ -54,17 +57,8 @@ def setup_folders(csv_path, source_base, target_base, overwrite=False):
                     shutil.copy2(src, dst)
                     print(f"Copied: {src.name} to {dst.parent.name}")
                 else:
-                    print(f"Skipped: {src.name} already exists.")
+                    print(f"Skipped: {src.name} already exists in correct training/test folder.")
             else:
                 print(f"Warning: Source file not found: {src}")
 
-# --- CONFIGURATION ---
-CSV_FILE = r"R:\TM Internships\Dept of CMF\Bram Roumen\Master Thesis - CMF\Thesis\nnUNet\Landmarking\gt_labels\patient_data_part_two\train_test_split.csv"
-SOURCE_DIR = r"R:\TM Internships\Dept of CMF\Nynke van Jaarsveld\Code\database\groundtruth"
-TARGET_DIR = r"R:\TM Internships\Dept of CMF\Nynke van Jaarsveld\Code\database\groundtruth_split"
-
-# Set to True if you want to force overwrite existing files
-OVERWRITE_FILES = False 
-
-if __name__ == "__main__":
-    setup_folders(CSV_FILE, SOURCE_DIR, TARGET_DIR, overwrite=OVERWRITE_FILES)
+    return target_base

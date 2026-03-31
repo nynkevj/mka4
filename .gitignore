@@ -7,4 +7,5 @@ database/
 
 # Also ignore python cache 
 .vscode/
+__pycache__
 

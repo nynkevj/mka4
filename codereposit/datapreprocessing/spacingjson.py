@@ -2,26 +2,24 @@ import os
 import json
 import nibabel as nib
 
-def create_nnlandmark_spacing_file(base_dir):
-    gt_dir = os.path.join(base_dir, 'groundtruth')
-    output_dir = os.path.join(base_dir, 'groundtruth_split')
-    output_file = os.path.join(output_dir, 'spacing.json')
+def create_spacing_file(groundtruth_dir, groundtruth_split_dir):
+    output_file = os.path.join(groundtruth_split_dir, 'spacing.json')
 
     # Ensure the output directory exists before proceeding
-    if not os.path.exists(output_dir):
-        print(f"Error: Target directory {output_dir} does not exist. Please create it first.")
+    if not os.path.exists(groundtruth_split_dir):
+        print(f"Error: Target directory {groundtruth_split_dir} does not exist. Please create it first.")
         return
     
     # Dictionary to hold our final JSON structure
     master_spacing = {}
 
-    if not os.path.exists(gt_dir):
-        print(f"Error: Directory {gt_dir} does not exist.")
+    if not os.path.exists(groundtruth_dir):
+        print(f"Error: Directory {groundtruth_dir} does not exist.")
         return
 
     # Iterate through each case subfolder
-    for case_id in os.listdir(gt_dir):
-        case_path = os.path.join(gt_dir, case_id)
+    for case_id in os.listdir(groundtruth_dir):
+        case_path = os.path.join(groundtruth_dir, case_id)
         
         if os.path.isdir(case_path):
             img_name = f"{case_id}_0000.nii.gz"
@@ -43,20 +41,16 @@ def create_nnlandmark_spacing_file(base_dir):
                     "image_spacing": img_spacing,
                     "annotation_spacing": anno_spacing
                 }
-                print(f"Processed {case_id}: Spacing {anno_spacing}")
+                # print(f"Processed {case_id}: Spacing {anno_spacing}")
 
             except Exception as e:
                 print(f"Skipping {case_id} due to error: {e}")
 
     # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(groundtruth_split_dir, exist_ok=True)
 
     # Write the JSON file
     with open(output_file, 'w') as f:
         json.dump(master_spacing, f, indent=2)
 
-    print(f"\nDone! File saved to: {output_file}")
-
-# Execute
-base_path = r'R:\\TM Internships\\Dept of CMF\\Nynke van Jaarsveld\\Code\\database\\highres'
-create_nnlandmark_spacing_file(base_path)
+    print(f"\nCreated spacing.json at {output_file}\n")
