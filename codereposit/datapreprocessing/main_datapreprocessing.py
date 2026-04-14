@@ -8,6 +8,7 @@ Author: Nynke van Jaarsveld (n.vanjaarsveld@student.tudelft.nl)
 Main preprocessing file 
 
 Input: CBCT files and json files containing landmark coordinates per patient (found in GROUNDTRUTH_PATH)
+    Make sure all of the json files have the same landmark labels, otherwise run reset_jsonlabel.py to be found in periprocessing folder
 Output: Multilabel segmentation map per patient in format suitable for NN Landmark (to be found in groundtruth_split_path (same parent folder as GROUNDTRUTH_PATH))
 
 """
@@ -23,7 +24,7 @@ SPLIT_PATH = r"R:\\TM Internships\\Dept of CMF\\Bram Roumen\\Master Thesis - CMF
 ### MULTI LABEL SEGMENTATION
 ## Creates 3x3 multilabel segmentation maps based on json files with landmark coordinates in an empty CBCT template
 
-overwrite_multilabel_segmentation = False
+overwrite_multilabel_segmentation = True
 central_landmark_index = multilabelsegmentation(GROUNDTRUTH_PATH, overwrite_multilabel_segmentation)
 
 ### NN LANDMARK FILE REORGANIZATION
@@ -31,7 +32,7 @@ central_landmark_index = multilabelsegmentation(GROUNDTRUTH_PATH, overwrite_mult
 ## Train and test split is based on split defined in csv file in SPLIT_PATH
 
 # Reorganization
-overwrite_split = False
+overwrite_split = True
 groundtruth_split_path = setup_folders(SPLIT_PATH, GROUNDTRUTH_PATH, overwrite_split)
 
 # Create spacing.json (see NNLandmark Github)

@@ -45,7 +45,7 @@ def setup_folders(csv_path, source_base, overwrite=False):
         # Define source and destination file paths
         # Source: source_base / patient_name / patientname_0000.nii
         src_img = source_base / patient_name / f"{patient_name}_0000.nii.gz"
-        src_lbl = source_base / patient_name / f"{patient_name}.nii.gz"
+        src_lbl = source_base / patient_name / f"{patient_name}_landmark_map.nii.gz"
 
         dst_img = img_dest_folder / f"{patient_name}_0000.nii.gz"
         dst_lbl = lbl_dest_folder / f"{patient_name}.nii.gz"

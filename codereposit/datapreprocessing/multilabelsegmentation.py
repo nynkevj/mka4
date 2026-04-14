@@ -113,7 +113,7 @@ class Patient:
         # Validate label - check whether JSON name coincides with a name mentioned in JSON_LANDMARK_LABELS (global)
         if label_value is None:
             if label_name not in unknown_labels:
-                print(f" Warning: '{label_name}' NOT in {JSON_LANDMARK_LABELS}. Skipping...")
+                print(f" Warning: 'Found {label_name}' NOT in predefined landmark labels. Skipping extra label...")
                 unknown_labels.add(label_name)
             return
 
@@ -200,7 +200,7 @@ def multilabelsegmentation(base_path, overwrite):
 
         # Check if we need to process or if we can just load
         if overwrite or not os.path.exists(output_path):
-            print(f"Processing Patient: {p.id}")
+            print(f"Processing segmentation map patient: {p.id}")
             segmented_blocks = p.segm_map()
             sitk.WriteImage(segmented_blocks, output_path)
             all_landmark_indices[p.id] = p.landmark_indices
