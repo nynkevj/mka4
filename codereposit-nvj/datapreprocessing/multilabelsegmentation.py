@@ -9,16 +9,6 @@ import json
 import SimpleITK as sitk
 
 
-# Labels for multilabel segmentation map for each patient - to be divided in two parts?
-JSON_LANDMARK_LABELS = {'13': 1, '16': 2, '23': 3, '26': 4, '33': 5, '36': 6, '43': 7, '46': 8, 'anteriornasalspine': 9,
-                         'bpoint': 10, 'basion': 11, 'gnation': 12, 'inferiorborderl': 13, 'inferiorborderr': 14, 'infraorbitalel': 15,
-                           'infraorbitaler': 16, 'isl1': 17, 'isl1l': 18, 'isl1r': 19, 'isu1': 20, 'lingulal': 21, 'lingular': 22,
-                             'm2linel': 23, 'm2liner': 24, 'menton': 25, 'nasalnotchl': 26, 'nasalnotchr': 27, 'nasion': 28,
-                               'pogonion': 29, 'pointa': 30, 'porionl': 31, 'porionr': 32, 'posteriornasalspine': 33, 'sella': 34,
-                                 'zygomaticprocessl': 35, 'zygomaticprocessr': 36, 'lcondyl': 37, 'lcoronoid': 38, 'lforamenmentale': 39,
-                                   'lgonion': 40, 'lsigmoidnotch': 41, 'rcondyle': 42, 'rcoronoid': 43, 'rforamenmentale': 44, 'rgonion': 45,
-                                     'rsigmoidnotch': 46}
-
 class Patient:
     def __init__(self, folder_path):
         """
@@ -72,7 +62,7 @@ class Patient:
         
         return blank_map
     
-    def segm_map(self):
+    def segm_map(self, json_landmarks):
         """
         Create multi-label segmentation map where each individual landmark is signified by its own 3x3 voxel label
         """
@@ -84,11 +74,11 @@ class Patient:
         overlaps = {} 
 
         for json_path in self.landmark_paths:
-            self.json_file_handling(json_path, segmentation, unknown_labels, overlaps)
+            self.json_file_handling(json_path, segmentation, json_landmarks, unknown_labels, overlaps)
 
         return segmentation
 
-    def json_file_handling(self, json_path, segmentation, unknown_labels, overlaps):
+    def json_file_handling(self, json_path, segmentation, json_landmarks, unknown_labels, overlaps):
         """
         Opens and reads json file to extract name and coordinates of landmark 
         """
@@ -98,19 +88,19 @@ class Patient:
             
             for markup in data.get('markups', []):
                 for point in markup.get('controlPoints', []):
-                    self.coord_to_segm(point, segmentation, unknown_labels, overlaps)
+                    self.coord_to_segm(point, segmentation, json_landmarks, unknown_labels, overlaps)
                     
         except (json.JSONDecodeError, FileNotFoundError) as e:
             print(f" Error reading JSON {json_path}: {e}")
 
-    def coord_to_segm(self, point, segmentation, unknown_labels, overlaps):
+    def coord_to_segm(self, point, segmentation, json_landmarks, unknown_labels, overlaps):
         """
         Handles spatial logic for a single landmark point
         """
         label_name = point.get('label')
-        label_value = JSON_LANDMARK_LABELS.get(label_name)
+        label_value = json_landmarks.get(label_name)
 
-        # Validate label - check whether JSON name coincides with a name mentioned in JSON_LANDMARK_LABELS (global)
+        # Validate label - check whether JSON name coincides with a name mentioned in json_landmarks (global)
         if label_value is None:
             if label_name not in unknown_labels:
                 print(f" Warning: 'Found {label_name}' NOT in predefined landmark labels. Skipping extra label...")
@@ -135,12 +125,12 @@ class Patient:
                         idx = (center_idx[0] + x, center_idx[1] + y, center_idx[2] + z)
                         
                         if self.is_inside_img(segmentation, idx):
-                            self.overlap_check(idx, label_value, label_name, segmentation, overlaps)
+                            self.overlap_check(idx, label_value, label_name, json_landmarks, segmentation, overlaps)
 
         except Exception:
             print(f" Point {label_name} is outside image volume for {self.id}")
 
-    def overlap_check(self, idx, label_value, label_name, segmentation, overlaps):
+    def overlap_check(self, idx, label_value, label_name, json_landmarks, segmentation, overlaps):
         """
         Checks whether pixel had already been assigned a label (thus if there is overlap).
         NB: if there is overlap the pixel will be overwritten by the new label!
@@ -149,7 +139,7 @@ class Patient:
         
         if existing_val != 0 and existing_val != label_value:
             # Reverse lookup for the existing label name
-            existing_name = next((k for k, v in JSON_LANDMARK_LABELS.items() if v == existing_val), "Unknown")
+            existing_name = next((k for k, v in json_landmarks.items() if v == existing_val), "Unknown")
             pair = tuple(sorted((label_name, existing_name)))
             
             if pair not in overlaps:
@@ -165,7 +155,7 @@ class Patient:
         size = img.GetSize()
         return all(0 <= index[i] < size[i] for i in range(3))
     
-    def load_indices_from_segm(self, file_path):
+    def load_indices_from_segm(self, file_path, json_landmarks):
         """
         If multilabel segmentation map already exists, this function loads the image and 
         extracts the central voxel indices for every label found.
@@ -174,7 +164,7 @@ class Patient:
         stats = sitk.LabelShapeStatisticsImageFilter()
         stats.Execute(img)
 
-        reverse_labels = {v: k for k, v in JSON_LANDMARK_LABELS.items()}
+        reverse_labels = {v: k for k, v in json_landmarks.items()}
 
         for label_value in stats.GetLabels():
             if label_value in reverse_labels:
@@ -187,7 +177,8 @@ class Patient:
                 self.landmark_indices[label_name] = list(center_idx)
 
 
-def multilabelsegmentation(base_path, overwrite):
+def multilabelsegmentation(base_path, predefined_landmarks, overwrite):
+    
     all_landmark_indices = {}
     
     # Get list of patient folders
@@ -201,12 +192,12 @@ def multilabelsegmentation(base_path, overwrite):
         # Check if we need to process or if we can just load
         if overwrite or not os.path.exists(output_path):
             print(f"Processing segmentation map patient: {p.id}")
-            segmented_blocks = p.segm_map()
+            segmented_blocks = p.segm_map(predefined_landmarks)
             sitk.WriteImage(segmented_blocks, output_path)
             all_landmark_indices[p.id] = p.landmark_indices
         else:
             print(f"Skipping creation of multilabel segmentation maps for {p.id}, file already exists.")
-            p.load_indices_from_segm(output_path)
+            p.load_indices_from_segm(output_path, predefined_landmarks)
             
         all_landmark_indices[p.id] = p.landmark_indices 
 

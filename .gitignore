@@ -1,9 +1,13 @@
 # Ignore database directory with large nii files
-database/
+database-mml
+database-dgmld
+database-nvj
+nnLandmark
 
 # Just to be sure: no .nii files
 *.nii
 *.nii.gz
+
 
 # Also ignore python cache 
 .vscode/
