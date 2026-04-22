@@ -19,7 +19,7 @@ from spacingjson import create_spacing_file
 from all_landmarks_voxel_json import landmarks_json
 from datasetjson import create_dataset_json
 
-GROUNDTRUTH_PATH = r"R:\\TM Internships\\Dept of CMF\\Nynke van Jaarsveld\\Code\\database-nvj\\lowres1\\groundtruth"
+GROUNDTRUTH_PATH = r"R:\\TM Internships\\Dept of CMF\\Nynke van Jaarsveld\\Code\\database-nvj\\lowres_1lm\\groundtruth"
 SPLIT_PATH = r"R:\\TM Internships\\Dept of CMF\\Bram Roumen\\Master Thesis - CMF\\Thesis\\nnUNet\\Landmarking\\gt_labels\\patient_data_part_two\\train_test_split.csv"
 JSON_LANDMARK_LABELS = {'13': 1}
 # JSON_LANDMARK_LABELS = {'13': 1, '16': 2, '23': 3, '26': 4, '33': 5, '36': 6, '43': 7, '46': 8, 'anteriornasalspine': 9,
@@ -35,7 +35,8 @@ JSON_LANDMARK_LABELS = {'13': 1}
 ## Creates 3x3 multilabel segmentation maps based on json files with landmark coordinates in an empty CBCT template
 
 overwrite_multilabel_segmentation = False
-central_landmark_index = multilabelsegmentation(GROUNDTRUTH_PATH, JSON_LANDMARK_LABELS, overwrite_multilabel_segmentation)
+crop_cbct_landmarks = True
+central_landmark_index = multilabelsegmentation(GROUNDTRUTH_PATH, JSON_LANDMARK_LABELS, overwrite_multilabel_segmentation, crop_cbct_landmarks)
 
 ### NN LANDMARK FILE REORGANIZATION
 ## Reorganizes the original CBCT images and multilabel segmentation maps into images and labels respectively
@@ -43,7 +44,7 @@ central_landmark_index = multilabelsegmentation(GROUNDTRUTH_PATH, JSON_LANDMARK_
 
 # Reorganization
 overwrite_split = True
-groundtruth_split_path = setup_folders(SPLIT_PATH, GROUNDTRUTH_PATH, overwrite_split)
+groundtruth_split_path = setup_folders(SPLIT_PATH, GROUNDTRUTH_PATH, overwrite_split, crop_cbct_landmarks)
 
 # Create spacing.json (see NNLandmark Github)
 create_spacing_file(GROUNDTRUTH_PATH, groundtruth_split_path)

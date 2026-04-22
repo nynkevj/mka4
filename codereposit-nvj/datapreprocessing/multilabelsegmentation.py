@@ -62,6 +62,13 @@ class Patient:
         
         return blank_map
     
+    def is_inside_img(self, img, index):
+        """
+        Checks whether index of landmark is within size of template segmentation map
+        """
+        size = img.GetSize()
+        return all(0 <= index[i] < size[i] for i in range(3))
+    
     def segm_map(self, json_landmarks):
         """
         Create multi-label segmentation map where each individual landmark is signified by its own 3x3 voxel label
@@ -99,15 +106,15 @@ class Patient:
         """
         label_name = point.get('label')
         label_value = json_landmarks.get(label_name)
+        coords = point.get('position')
 
         # Validate label - check whether JSON name coincides with a name mentioned in json_landmarks (global)
         if label_value is None:
             if label_name not in unknown_labels:
-                print(f" Warning: 'Found {label_name}' NOT in predefined landmark labels. Skipping extra label...")
+                # print(f" Warning: 'Found {label_name}' NOT in predefined landmark labels. Skipping extra label...")
                 unknown_labels.add(label_name)
             return
-
-        coords = point.get('position')
+        
         if not coords:
             return
 
@@ -148,56 +155,99 @@ class Patient:
 
         segmentation.SetPixel(idx, label_value)
 
-    def is_inside_img(self, img, index):
-        """
-        Checks whether index of landmark is within size of template segmentation map
-        """
-        size = img.GetSize()
-        return all(0 <= index[i] < size[i] for i in range(3))
     
-    def load_indices_from_segm(self, file_path, json_landmarks):
+    def crop_to_landmarks(self, image, margin=10):
         """
-        If multilabel segmentation map already exists, this function loads the image and 
-        extracts the central voxel indices for every label found.
+        Crops the input image to a bounding box containing all found landmarks.
         """
-        img = sitk.ReadImage(file_path)
-        stats = sitk.LabelShapeStatisticsImageFilter()
-        stats.Execute(img)
+        if not self.landmark_indices:
+            print(f"No landmarks found for {self.id}, skipping crop.")
+            return image
 
-        reverse_labels = {v: k for k, v in json_landmarks.items()}
-
-        for label_value in stats.GetLabels():
-            if label_value in reverse_labels:
-                label_name = reverse_labels[label_value]
-                
-                # Get the centroid in physical coordinates, then convert to index
-                centroid_physical = stats.GetCentroid(label_value)
-                center_idx = img.TransformPhysicalPointToIndex(centroid_physical)
-                
-                self.landmark_indices[label_name] = list(center_idx)
-
-
-def multilabelsegmentation(base_path, predefined_landmarks, overwrite):
+        # Get all indices as a list of tuples
+        indices = list(self.landmark_indices.values())
+        
+        # Calculate min and max for each dimension
+        # indices are [x, y, z]
+        min_coords = [min(pt[i] for pt in indices) for i in range(3)]
+        max_coords = [max(pt[i] for pt in indices) for i in range(3)]
+        
+        size = image.GetSize()
+        
+        # Apply margin and clamp to image boundaries
+        start_index = [
+            int(max(0, min_coords[i] - margin)) 
+            for i in range(3)
+        ]
+        
+        # Calculate end index to find size
+        end_index = [
+            int(min(size[i] - 1, max_coords[i] + margin)) 
+            for i in range(3)
+        ]
+        
+        # Extract the region: RegionOfInterest(image, size, index)
+        crop_size = [int(end_index[i] - start_index[i] + 1) for i in range(3)]
+        
+        return sitk.RegionOfInterest(image, [int(s) for s in crop_size], [int(i) for i in start_index])
     
+    def load_indices_from_json(self, json_landmarks):
+        """
+        Extracts indices from JSON without creating/loading full heavy images.
+        """
+        if not self.cbct_path:
+            return
+
+        # Use ImageFileReader to read ONLY metadata (super fast)
+        reader = sitk.ImageFileReader()
+        reader.SetFileName(self.cbct_path)
+        reader.ReadImageInformation()
+        
+        # We need these to convert physical points to indices manually or via a dummy
+        # But even better: just load a tiny 1-pixel image with the same metadata 
+        # to use the TransformPhysicalPointToIndex method.
+        for json_path in self.landmark_paths:
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+                for markup in data.get('markups', []):
+                    for point in markup.get('controlPoints', []):
+                        label_name = point.get('label')
+                        coords = point.get('position')
+                        if label_name in json_landmarks and coords:
+                            # Use the reader's information to transform
+                            idx = reader.GetImage().TransformPhysicalPointToIndex(coords)
+                            self.landmark_indices[label_name] = list(idx)
+            except Exception as e:
+                print(f"Error fast-loading JSON {json_path}: {e}")
+
+
+def multilabelsegmentation(base_path, predefined_landmarks, overwrite, do_crop=False):
     all_landmark_indices = {}
-    
-    # Get list of patient folders
     patient_folders = [item for item in os.listdir(base_path) if item.startswith('ma')]
 
     for folder in patient_folders:
         full_path = os.path.join(base_path, folder)
         p = Patient(full_path)
+        
         output_path = os.path.join(p.path, f"{p.id}_landmark_map.nii.gz")
+        cropped_map_path = os.path.join(p.path, f"{p.id}_cropped_landmark_map.nii.gz")
+        cropped_cbct_path = os.path.join(p.path, f"{p.id}_cropped_cbct.nii.gz")
 
-        # Check if we need to process or if we can just load
         if overwrite or not os.path.exists(output_path):
-            print(f"Processing segmentation map patient: {p.id}")
             segmented_blocks = p.segm_map(predefined_landmarks)
             sitk.WriteImage(segmented_blocks, output_path)
-            all_landmark_indices[p.id] = p.landmark_indices
         else:
-            print(f"Skipping creation of multilabel segmentation maps for {p.id}, file already exists.")
-            p.load_indices_from_segm(output_path, predefined_landmarks)
+            p.load_indices_from_json(predefined_landmarks)
+            segmented_blocks = sitk.ReadImage(output_path)
+
+        if do_crop:
+            cropped_blocks = p.crop_to_landmarks(segmented_blocks)
+            sitk.WriteImage(cropped_blocks, cropped_map_path)
+            
+            original_cbct = sitk.ReadImage(p.cbct_path)
+            cropped_cbct = p.crop_to_landmarks(original_cbct)
+            sitk.WriteImage(cropped_cbct, cropped_cbct_path)
             
         all_landmark_indices[p.id] = p.landmark_indices 
 

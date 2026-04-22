@@ -9,7 +9,7 @@ import pandas as pd
 import shutil
 from pathlib import Path
 
-def setup_folders(csv_path, source_base, overwrite=False):
+def setup_folders(csv_path, source_base, overwrite=False, cropped=False):
     csv_path = Path(csv_path)
     source_base = Path(source_base)
     
@@ -43,8 +43,10 @@ def setup_folders(csv_path, source_base, overwrite=False):
             lbl_dest_folder = labels_ts
 
         # Define source and destination file paths
-        # Source: source_base / patient_name / patientname_0000.nii
-        src_img = source_base / patient_name / f"{patient_name}_0000.nii.gz"
+        if cropped is False:
+            src_img = source_base / patient_name / f"{patient_name}_0000.nii.gz"
+        if cropped is True:
+            src_img = source_base / patient_name / f"{patient_name}_cropped_cbct.nii.gz"
         src_lbl = source_base / patient_name / f"{patient_name}_landmark_map.nii.gz"
 
         dst_img = img_dest_folder / f"{patient_name}_0000.nii.gz"
