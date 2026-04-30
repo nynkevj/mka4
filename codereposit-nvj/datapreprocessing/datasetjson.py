@@ -36,6 +36,6 @@ def create_dataset_json(groundtruthsplit_path, json_landmarks):
     try:
         with open(output_file, 'w') as f:
             json.dump(dataset_data, f, indent=4)
-        print(f"\n Successfully created dataset.json at {output_file}")
+        print(f"\nCreated dataset.json at {output_file}")
     except Exception as e:
         print(f"An error occurred: {e}")

@@ -45,9 +45,10 @@ def setup_folders(csv_path, source_base, overwrite=False, cropped=False):
         # Define source and destination file paths
         if cropped is False:
             src_img = source_base / patient_name / f"{patient_name}_0000.nii.gz"
+            src_lbl = source_base / patient_name / f"{patient_name}_landmark_map.nii.gz"
         if cropped is True:
-            src_img = source_base / patient_name / f"{patient_name}_cropped_cbct.nii.gz"
-        src_lbl = source_base / patient_name / f"{patient_name}_landmark_map.nii.gz"
+            src_img = source_base / patient_name / 'cropped_files' / f"{patient_name}_0000.nii.gz"
+            src_lbl  = source_base / patient_name / 'cropped_files' / f"{patient_name}_landmark_map.nii.gz"
 
         dst_img = img_dest_folder / f"{patient_name}_0000.nii.gz"
         dst_lbl = lbl_dest_folder / f"{patient_name}.nii.gz"
